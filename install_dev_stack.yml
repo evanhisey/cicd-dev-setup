@@ -1,0 +1,100 @@
+---
+- name: Install Development Stack Add-On (RPM Only)
+  hosts: "{{ target_hosts | default('localhost') }}"
+  connection: "{{ 'local' if (target_hosts | default('localhost')) == 'localhost' else 'smart' }}"
+  # Removed global 'become: true'. Privilege escalation is now targeted.
+
+  tasks:
+    # =====================================================================
+    # SYSTEM CONFIGURATION (RUNS AS ROOT VIA SUDO)
+    # =====================================================================
+    - name: System Package and Repository Setup
+      become: true
+      block:
+        - name: Ensure required base utilities are installed
+          ansible.builtin.dnf:
+            name: ['curl', 'git', 'jq']
+            state: present
+
+        - name: Install EPEL Release (RHEL-family only)
+          ansible.builtin.dnf:
+            name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
+            state: present
+          when: ansible_distribution in ['RedHat', 'CentOS', 'Rocky', 'AlmaLinux']
+
+        - name: Add required RPM repositories
+          ansible.builtin.yum_repository:
+            name: "{{ item.name }}"
+            description: "{{ item.desc }}"
+            baseurl: "{{ item.url }}"
+            enabled: true
+            gpgcheck: true
+            gpgkey: "{{ item.key }}"
+          loop:
+            - name: vscode
+              desc: Visual Studio Code
+              url: https://packages.microsoft.com/yumrepos/vscode
+              key: https://packages.microsoft.com/keys/microsoft.asc
+            - name: packages-microsoft-com-prod
+              desc: Microsoft Packages Production (PowerShell)
+              url: https://packages.microsoft.com/rhel/9/prod/
+              key: https://packages.microsoft.com/keys/microsoft.asc
+            - name: hashicorp
+              desc: HashiCorp Stable - $basearch
+              url: "https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable"
+              key: https://rpm.releases.hashicorp.com/gpg
+          when: >
+            item.name == 'vscode' or 
+            ansible_distribution in ['RedHat', 'CentOS', 'Rocky', 'AlmaLinux']
+
+        - name: Install ansible-core (Strictly from official OS repos)
+          ansible.builtin.dnf:
+            name: ansible-core
+            state: present
+
+        - name: Install Development Tooling via DNF
+          ansible.builtin.dnf:
+            name: ['code', 'terraform', 'powershell', 'ansible-lint']
+            state: present
+            update_cache: true
+
+    # =====================================================================
+    # USER CONFIGURATION (RUNS NATIVELY AS THE EXECUTING USER)
+    # =====================================================================
+    - name: Install VS Code extensions
+      ansible.builtin.command: "code --install-extension {{ item }}"
+      # No become_user or $HOME spoofing needed. Runs cleanly as the developer.
+      register: vscode_ext_install
+      changed_when: "'was successfully installed' in vscode_ext_install.stdout"
+      failed_when: 
+        - vscode_ext_install.rc != 0
+        - "'already installed' not in vscode_ext_install.stderr"
+      loop:
+        - redhat.ansible
+        - hashicorp.terraform
+        - github.copilot
+        - github.copilot-chat
+        - ms-vscode.powershell
+        - amazonwebservices.aws-toolkit-vscode
+
+    - name: Display Post-Installation Guidelines
+      ansible.builtin.debug:
+        msg: |
+          ======================================================================
+          POST-INSTALLATION NOTES & GUIDELINES
+          ======================================================================
+          1. Environment Setup Complete:
+             The development stack has been configured for your user account.
+             Launch Visual Studio Code from your application menu.
+
+          2. AWS Toolkit Authentication:
+             Open VS Code and click the AWS icon on the left sidebar. 
+             Authenticate using IAM Identity Center (SSO) or standard credentials.
+
+          3. GitHub Copilot Enterprise Setup:
+             A. Click the 'Accounts' icon (bottom left).
+             B. Select "Sign in with GitHub Enterprise".
+             C. If using a self-hosted GitHub Enterprise Server (GHES), add:
+                "github.copilot.advanced": { "authProvider": "github-enterprise" }
+                to your settings.json.
+          ======================================================================

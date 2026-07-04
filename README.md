@@ -19,7 +19,44 @@ This Ansible playbook is an **add-on module** designed to safely layer a strict,
 
 ## Usage
 
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repo-url>
-   cd <repo-name>
+**Clone the repository:**
+```bash
+git clone <your-repo-url>
+cd <repo-name>
+
+### Playbook Execution Guide
+
+This guide details how to execute the Dev Stack Add-On playbook. **You must run this playbook as the standard developer account** that will be using the workstation (e.g., `ec2-user`, `jdoe`). Do not run this as the `root` user. Your user account must have `sudo` privileges to install the required system packages.
+
+## Prerequisites
+* **Ansible** installed on the control node or local machine (`sudo dnf install ansible-core`).
+* Administrator (`sudo`) privileges on the target node.
+
+---
+
+#### Option A: Local Execution (Default)
+
+Use this method if you are already logged into the pre-provisioned RHEL 9 GUI instance (e.g., via RDP or console) and want to apply the configuration directly to your current session. 
+
+The playbook assumes local execution by default. The `-K` (or `--ask-become-pass`) flag is required to prompt for your user's `sudo` password to install system packages.
+
+```bash
+ansible-playbook install_dev_stack.yml -K
+
+#### Option B: Remote Execution via SSH
+Use this method if you are pushing this configuration from a central control node (like your laptop or a bastion host) to one or more remote workstations.
+
+You must define your target hosts in an inventory file and pass the target group using the -e target_hosts extra variable.
+
+Create an inventory file (e.g., inventory.ini):
+
+```Ini, TOML
+[dev_workstations]
+198.51.100.10
+198.51.100.11
+Execute the playbook:
+
+```Bash
+ansible-playbook -i inventory.ini install_dev_stack.yml -e "target_hosts=dev_workstations" -u <developer-username> --private-key=/path/to/your/key.pem -K
+
+Note: If your SSH key is already added to your ssh-agent, you can omit the --private-key flag.

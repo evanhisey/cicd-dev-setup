@@ -2,6 +2,11 @@
 - name: Install Development Stack Add-On (RPM Only)
   hosts: "{{ target_hosts | default('localhost') }}"
   connection: "{{ 'local' if (target_hosts | default('localhost')) == 'localhost' else 'smart' }}"
+  vars:
+    microsoft_repo_url: >-
+      {{ 'https://packages.microsoft.com/fedora/' ~ ansible_distribution_major_version ~ '/prod/' if ansible_distribution == 'Fedora' else 'https://packages.microsoft.com/rhel/9/prod/' }}
+    hashicorp_repo_url: >-
+      {{ 'https://rpm.releases.hashicorp.com/fedora/' ~ ansible_distribution_major_version ~ '/$basearch/stable' if ansible_distribution == 'Fedora' else 'https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable' }}
   # Removed global 'become: true'. Privilege escalation is now targeted.
 
   tasks:
@@ -20,7 +25,7 @@
           ansible.builtin.dnf:
             name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
             state: present
-          when: ansible_distribution in ['RedHat', 'CentOS', 'Rocky', 'AlmaLinux']
+          when: ansible_os_family == 'RedHat' and ansible_distribution != 'Fedora'
 
         - name: Add required RPM repositories
           ansible.builtin.yum_repository:
@@ -37,15 +42,13 @@
               key: https://packages.microsoft.com/keys/microsoft.asc
             - name: packages-microsoft-com-prod
               desc: Microsoft Packages Production (PowerShell)
-              url: https://packages.microsoft.com/rhel/9/prod/
+              url: "{{ microsoft_repo_url }}"
               key: https://packages.microsoft.com/keys/microsoft.asc
             - name: hashicorp
               desc: HashiCorp Stable - $basearch
-              url: "https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable"
+              url: "{{ hashicorp_repo_url }}"
               key: https://rpm.releases.hashicorp.com/gpg
-          when: >
-            item.name == 'vscode' or 
-            ansible_distribution in ['RedHat', 'CentOS', 'Rocky', 'AlmaLinux']
+          when: ansible_os_family == 'RedHat'
 
         - name: Install ansible-core (Strictly from official OS repos)
           ansible.builtin.dnf:

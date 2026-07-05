@@ -27,8 +27,8 @@ This Ansible playbook is an add-on module designed to safely layer a strict, RPM
 #### Clone the repository
 
 ```bash
-git clone <your-repo-url>
-cd <repo-name>
+git clone https://github.com/evanhisey/cicd-dev-setup.git
+cd cicd-dev-setup
 ```
 
 #### Playbook execution guide

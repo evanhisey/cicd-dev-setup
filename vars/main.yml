@@ -1,0 +1,34 @@
+---
+microsoft_repo_url: >-
+  {{ 'https://packages.microsoft.com/fedora/' ~ ansible_facts['distribution_major_version'] ~ '/prod/' if ansible_facts['distribution'] == 'Fedora' else 'https://packages.microsoft.com/rhel/9/prod/' }}
+hashicorp_repo_url: >-
+  {{ 'https://rpm.releases.hashicorp.com/fedora/' ~ ansible_facts['distribution_major_version'] ~ '/$basearch/stable' if ansible_facts['distribution'] == 'Fedora' else 'https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable' }}
+install_powershell: >-
+  {{ ansible_facts['os_family'] == 'RedHat' and ansible_facts['distribution'] != 'Fedora' }}
+base_tooling_packages:
+  - code
+  - terraform
+  - ansible-lint
+vscode_extensions:
+  - redhat.ansible
+  - hashicorp.terraform
+  - amazonwebservices.aws-toolkit-vscode
+post_install_guidelines: |
+  ======================================================================
+  POST-INSTALLATION NOTES & GUIDELINES
+  ======================================================================
+  1. Environment Setup Complete:
+     The development stack has been configured for your user account.
+     Launch Visual Studio Code from your application menu.
+
+  2. AWS Toolkit Authentication:
+     Open VS Code and click the AWS icon on the left sidebar.
+     Authenticate using IAM Identity Center (SSO) or standard credentials.
+
+  3. GitHub Copilot Enterprise Setup:
+     A. Click the 'Accounts' icon (bottom left).
+     B. Select "Sign in with GitHub Enterprise".
+     C. If using a self-hosted GitHub Enterprise Server (GHES), add:
+        "github.copilot.advanced": { "authProvider": "github-enterprise" }
+        to your settings.json.
+  ======================================================================

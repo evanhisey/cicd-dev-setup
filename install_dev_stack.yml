@@ -2,11 +2,8 @@
 - name: Install Development Stack Add-On (RPM Only)
   hosts: "{{ target_hosts | default('localhost') }}"
   connection: "{{ 'local' if (target_hosts | default('localhost')) == 'localhost' else 'smart' }}"
-  vars:
-    microsoft_repo_url: >-
-      {{ 'https://packages.microsoft.com/fedora/' ~ ansible_distribution_major_version ~ '/prod/' if ansible_distribution == 'Fedora' else 'https://packages.microsoft.com/rhel/9/prod/' }}
-    hashicorp_repo_url: >-
-      {{ 'https://rpm.releases.hashicorp.com/fedora/' ~ ansible_distribution_major_version ~ '/$basearch/stable' if ansible_distribution == 'Fedora' else 'https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable' }}
+  vars_files:
+    - vars/main.yml
   # Removed global 'become: true'. Privilege escalation is now targeted.
 
   tasks:
@@ -25,7 +22,7 @@
           ansible.builtin.dnf:
             name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
             state: present
-          when: ansible_os_family == 'RedHat' and ansible_distribution != 'Fedora'
+          when: ansible_facts['os_family'] == 'RedHat' and ansible_facts['distribution'] != 'Fedora'
 
         - name: Add required RPM repositories
           ansible.builtin.yum_repository:
@@ -48,7 +45,7 @@
               desc: HashiCorp Stable - $basearch
               url: "{{ hashicorp_repo_url }}"
               key: https://rpm.releases.hashicorp.com/gpg
-          when: ansible_os_family == 'RedHat'
+          when: ansible_facts['os_family'] == 'RedHat'
 
         - name: Install ansible-core (Strictly from official OS repos)
           ansible.builtin.dnf:
@@ -57,7 +54,7 @@
 
         - name: Install Development Tooling via DNF
           ansible.builtin.dnf:
-            name: ['code', 'terraform', 'powershell', 'ansible-lint']
+            name: "{{ base_tooling_packages + (['powershell'] if install_powershell else []) }}"
             state: present
             update_cache: true
 
@@ -69,35 +66,11 @@
       # No become_user or $HOME spoofing needed. Runs cleanly as the developer.
       register: vscode_ext_install
       changed_when: "'was successfully installed' in vscode_ext_install.stdout"
-      failed_when: 
+      failed_when:
         - vscode_ext_install.rc != 0
         - "'already installed' not in vscode_ext_install.stderr"
-      loop:
-        - redhat.ansible
-        - hashicorp.terraform
-        - github.copilot
-        - github.copilot-chat
-        - ms-vscode.powershell
-        - amazonwebservices.aws-toolkit-vscode
+      loop: "{{ vscode_extensions + (['ms-vscode.powershell'] if install_powershell else []) }}"
 
     - name: Display Post-Installation Guidelines
       ansible.builtin.debug:
-        msg: |
-          ======================================================================
-          POST-INSTALLATION NOTES & GUIDELINES
-          ======================================================================
-          1. Environment Setup Complete:
-             The development stack has been configured for your user account.
-             Launch Visual Studio Code from your application menu.
-
-          2. AWS Toolkit Authentication:
-             Open VS Code and click the AWS icon on the left sidebar. 
-             Authenticate using IAM Identity Center (SSO) or standard credentials.
-
-          3. GitHub Copilot Enterprise Setup:
-             A. Click the 'Accounts' icon (bottom left).
-             B. Select "Sign in with GitHub Enterprise".
-             C. If using a self-hosted GitHub Enterprise Server (GHES), add:
-                "github.copilot.advanced": { "authProvider": "github-enterprise" }
-                to your settings.json.
-          ======================================================================
+        msg: "{{ post_install_guidelines.split('\n') }}"
